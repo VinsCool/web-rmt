@@ -378,6 +378,7 @@ class RMTTune {
         var freq_table = frqtabpure_64khz
         switch(env_dist) {
             case 0xa:
+
                 //if(this.instrument.audctl & 0x40) {
                 //	if (this.instrument.audctl & 0x10) {
                 //	env_dist = 0xc
@@ -644,18 +645,21 @@ class Portamento {
 }
 
 export class RMTPlayer {
-    constructor(audioContext, pokeyNode) {
+    constructor(audioContext, pokeyNode, config) {
+        config = config || {}
         this.audioContext = audioContext
         this.pokeyNode = pokeyNode
-        this.currentFrame = 0
-        this.startTime = null
         this.state = "stopped"
         this.latency = 0.10
         this.pokeyRegs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-	// TODO: add a proper PAL/NTSC toggle
-        this.frameRate = 50
-        //this.frameRate = 60
-        this.frameInterval = 1 / this.frameRate
+        this.setFrameRate(config.frameRate || 50.0)
+    }
+
+    setFrameRate(fps) {
+        this.frameRate = fps
+        this.frameInterval = 1 / this.frameRate / (this.song && this.song.instrumentFreq || 1)
+        this.currentFrame = 0
+        this.startTime = this.getCurrentTime()
     }
 
     load(buffer) {
@@ -690,7 +694,9 @@ export class RMTPlayer {
         let event = new Event("rmt_player");
         event.data = {
             currentFrame: this.currentFrame,
-            frame_cnt: this.currentFrame,
+            instrPos: this.instrPos,
+            trackPos: this.trackPos,
+            tracksListPos: this.tracksListPos,
             pokeyRegs: regs || null,
             state: this.state,
         }
@@ -750,6 +756,9 @@ export class RMTPlayer {
 
         let currentTime = this.getCurrentTime();
         while(this.startTime + this.currentFrame * this.frameInterval < currentTime + this.latency) {
+            this.step()
+            this.sendEvent(this.pokeyRegs);
+            this.currentFrame += 1
             this.instrPos += 1
             if(this.instrPos >= this.songSpeed * this.song.instrumentFreq) {
                 this.instrPos = 0
@@ -757,15 +766,17 @@ export class RMTPlayer {
                 if(this.trackPos >= this.currentTracksSize) {
                     this.trackPos = 0
                     if(!this.repeat_track) {
-                        this.tracksListPos = (this.tracksListPos + 1) % this.song.trackLists.length
+                        this.tracksListPos += 1
+                        if(this.tracksListPos >= this.song.trackLists.length) {
+                            this.tracksListPos = 0
+                            this.currentFrame = 0
+                            this.startTime = currentTime
+                        }
                         this.loadTracks()
                     }
                 }
                 this.loadTracksEntries()
             }
-            this.step()
-            this.currentFrame += 1
-            this.sendEvent(this.pokeyRegs);
             // if(this.currentFrame == 0) {
             //     this.startTime = currentTime;
             //     return;
