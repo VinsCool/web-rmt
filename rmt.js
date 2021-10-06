@@ -362,6 +362,28 @@ class RMTTune {
         this.table_note = this.instrument.table[this.tpos]
     }
 
+        writeToAudctl(player) {
+                let env_idx = this.epos * 3
+        let envelope = this.instrument.envelope
+        let env_cmd = (envelope[env_idx + 1] >> 4) & 7
+        let env_xy = envelope[env_idx + 2]
+                var env_dist = ((envelope[env_idx + 1] >> 1) & 7) * 2
+                let env_lvol = envelope[env_idx] & 0xf
+        let env_rvol = envelope[env_idx] >> 4
+                let vol = this.channel < 4 ? env_lvol : env_rvol
+                var audc = VOLUME_TAB[player.getChannelVolume(this.channel) << 4 | vol] | (env_dist << 4)
+                // cmd 7 sets the instrument audctl
+                if (env_cmd == 7) {
+                        if(env_xy == 0xff) {
+                                audc |= 0xf0  // volume only
+            } else {
+                                //this.note = env_xy
+                                this.instrument.audctl = env_xy
+            }
+                }
+                player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
+        }
+
     play(player) {
         let env_idx = this.epos * 3
         let envelope = this.instrument.envelope
@@ -377,26 +399,10 @@ class RMTTune {
         this.env_filter = env_filter
 
         var freq_table = frqtabpure_64khz
+        var channel_audctl = player.getPokeyAudctl(this.pokey_idx)
         switch(env_dist) {
             case 0xa:
 
-                //if(this.instrument.audctl & 0x40) {
-                //	if (this.instrument.audctl & 0x10) {
-                //	env_dist = 0xc
-                //	freq_table = clarinet_lo
-                //	}
-                //	else {
-                //	}                
-                //}
-                //else if(this.instrument.audctl & 0x20) {
-                //	if (this.instrument.audctl & 0x08) {
-                //	env_dist = 0xc
-                //	freq_table = clarinet_lo   
-                //	}
-                //	else {
-                //	}            
-		//} 
-                //else if(this.instrument.audctl & 0x01) {
                 if(this.instrument.audctl & 0x01) {
                 env_dist = 0xa
                 freq_table = frqtabpure_15khz                
@@ -405,7 +411,7 @@ class RMTTune {
                 env_dist = 0xa
                 freq_table = frqtabpure_64khz
                 }
-                break;
+                break
 
             case 0xc:
                 if(this.instrument.audctl & 0x40) {
@@ -424,7 +430,7 @@ class RMTTune {
                 env_dist = 0xc
                 freq_table = frqtabbuzzy_64khz
                 }
-                break;
+                break
                 
             case 0xe:
                 if(this.instrument.audctl & 0x40) {
@@ -443,7 +449,7 @@ class RMTTune {
                 env_dist = 0xc
                 freq_table = frqtabgritty_64khz
                 }
-                break;
+                break
                 
             case 0x6:
                 if(this.instrument.audctl & 0x01) {
@@ -454,7 +460,7 @@ class RMTTune {
                 env_dist = 0xa
                 freq_table = frqtabpure_64khz
                 }
-                break;
+                break
                 
             case 0x2:
                 if(this.instrument.audctl & 0x40) {
@@ -469,8 +475,9 @@ class RMTTune {
                 env_dist = 0x2
                 freq_table = frqtabpoly5_64khz
                 }
-                break;       
+                break     
         }
+	console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "ch_audctl:", hex2(channel_audctl), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
         var audf = null
         var note = null
 
@@ -551,11 +558,6 @@ class RMTTune {
                 note = this.note
                 break
             case 7:
-                if(env_xy == 0x80) {
-                    audc |= 0xf0  // volume only
-                } else {
-                    this.note = env_xy
-                }
                 note = this.note
                 break
             default:
@@ -586,9 +588,15 @@ class RMTTune {
 
         player.setPokeyAudf(this.channel, audf)
         player.setPokeyAudc(this.channel, audc)
-        player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
+        //player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
+        this.tcnt = (this.tcnt + 1) % this.instrument.tspd
+        if(!this.tcnt) {
+            this.tpos += 1
+            if(this.tpos >= this.instrument.table.length) {
+                this.tpos = this.instrument.tgo
+            }
+        }
     }
-
     postPlay(player, prev_audctl) {
         let pokey_channel = this.channel % 4
         if(pokey_channel < 2) {
@@ -744,7 +752,7 @@ export class RMTPlayer {
                 + (isFinite(e.volume) && e.volume.toString(16).toUpperCase() || '-')
             )
         }).join(" | ")
-        console.log(`#${hex2(this.trackPos)} ${entry_txt}`)
+        //console.log(`#${hex2(this.trackPos)} ${entry_txt}`)
         _.each(entries, (e, channel) => {
             if(e.speed) {
                 this.songSpeed = e.speed
@@ -806,6 +814,13 @@ export class RMTPlayer {
         this.setPokeyAudctl(0, 0)
         if(n_channels > 4) {
             this.setPokeyAudctl(1, 0)
+        }
+                // update audctl with values from tone.instrument.audctl
+                for(var i=0; i<n_channels; i++) {
+            let tone = this.channelTone[i]
+            if(tone) {
+                tone.writeToAudctl(this)
+            }
         }
         for(var i=0; i<n_channels; i++) {
             let tone = this.channelTone[i]
