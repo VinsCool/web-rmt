@@ -498,12 +498,13 @@ class RMTTune {
                 this.eff_delay -= 1
             }
         }
-        if(this.tspd < 0) {
-            this.tspd = this.instrument.tspd
+
+        if(this.tspd < 1) {
+            this.tspd = this.instrument.tspd 
             this.tpos += 1
             if(this.tpos >= this.instrument.table.length) {
-                this.tpos = this.instrument.tgo
-            }
+               this.tpos = this.instrument.tgo
+        }
             if(this.instrument.tmode) {
                 this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
             } else {
@@ -585,17 +586,8 @@ class RMTTune {
         if(env_portamento) {
             audf = (frq + this.shiftfrq) & 0xff
         }
-
         player.setPokeyAudf(this.channel, audf)
         player.setPokeyAudc(this.channel, audc)
-        //player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
-        this.tcnt = (this.tcnt + 1) % this.instrument.tspd
-        if(!this.tcnt) {
-            this.tpos += 1
-            if(this.tpos >= this.instrument.table.length) {
-                this.tpos = this.instrument.tgo
-            }
-        }
     }
     postPlay(player, prev_audctl) {
         let pokey_channel = this.channel % 4
