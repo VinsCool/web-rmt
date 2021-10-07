@@ -400,8 +400,54 @@ class RMTTune {
         var freq_table = frqtabpure_64khz // default
         let global_audctl = player.getPokeyAudctl(this.pokey_idx)
         
-        if(((global_audctl & 0x40) && this.channel == 0) || ((global_audctl & 0x20) && (this.channel == 2))) {
-            console.log("1.79mhz mode detected, Channel ", this.channel)
+        if((global_audctl & 0x10) && ((this.channel == 0) || (this.channel == 1))) {
+            if(this.channel == 1) {
+                //console.log("Join mode detected, Channel ", this.channel)
+                switch(env_dist) {
+                case 0xa:
+                    env_dist = 0xa
+                    freq_table = clarinet_hi
+                    //console.log("freq_table clarinet_hi loaded in channel ", this.channel)              
+                    break                
+                }
+            }
+            else if((global_audctl & 0x40) && (this.channel == 0)) {
+                    //console.log("Join + 1.79mhz mode detected, Channel ", this.channel)
+                    switch(env_dist) {
+                    case 0xa:
+                        env_dist = 0xc
+                        freq_table = clarinet_lo 
+                        //console.log("freq_table clarinet_lo loaded in channel ", this.channel)             
+                        break                
+                    }   
+            }
+        }
+
+        else if((global_audctl & 0x08) && ((this.channel == 2) || (this.channel == 3))) {
+            if(this.channel == 3) {
+                //console.log("Join mode detected, Channel ", this.channel)
+                switch(env_dist) {
+                case 0xa:
+                    env_dist = 0xa
+                    freq_table = clarinet_hi
+                    //console.log("freq_table clarinet_hi loaded in channel ", this.channel)              
+                    break                
+                }
+            }
+            else if((global_audctl & 0x20) && (this.channel == 2)) {
+                    //console.log("Join + 1.79mhz mode detected, Channel ", this.channel)
+                    switch(env_dist) {
+                    case 0xa:
+                        env_dist = 0xc
+                        freq_table = clarinet_lo 
+                        //console.log("freq_table clarinet_lo loaded in channel ", this.channel)             
+                        break                
+                    }   
+            }
+        }
+        
+        else if((global_audctl & 0x40) && (this.channel == 0) || ((global_audctl & 0x20) && (this.channel == 2))) {
+            //console.log("1.79mhz mode detected, Channel ", this.channel)
             switch(env_dist) {
             case 0xe:
                 env_dist = 0xc
@@ -426,7 +472,7 @@ class RMTTune {
             }
         } 
         else if(global_audctl & 0x01) {
-            console.log("15khz mode detected")
+            //console.log("15khz mode detected")
             switch(env_dist) {
             case 0xe:
                 env_dist = 0xc
@@ -470,7 +516,7 @@ class RMTTune {
                 break
             }
         }
-	console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "global audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
+	//console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "global audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
         var audf = null
         var note = null
 
@@ -714,7 +760,7 @@ export class RMTPlayer {
         while(true) {
             track_list = this.song.trackLists[this.tracksListPos]
             if(track_list[0] != 0xfe) break;
-            // console.log("goto", track_list[1])
+            console.log("goto", track_list[1])
             this.tracksListPos = track_list[1]
         }
         this.current_tracks = Array.from(track_list).map( track_idx => {
@@ -739,7 +785,7 @@ export class RMTPlayer {
                 + (isFinite(e.volume) && e.volume.toString(16).toUpperCase() || '-')
             )
         }).join(" | ")
-        //console.log(`#${hex2(this.trackPos)} ${entry_txt}`)
+        console.log(`#${hex2(this.trackPos)} ${entry_txt}`)
         _.each(entries, (e, channel) => {
             if(e.speed) {
                 this.songSpeed = e.speed
