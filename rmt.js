@@ -352,8 +352,7 @@ class RMTTune {
         this.epos = 0
         this.tpos = 0
         this.is_repeating = false
-
-        this.tspd = this.instrument.tspd
+        this.tspd = this.instrument.tspd - 1
         this.vib_table = VIB_TABLE[instrument.vibrato]
         this.vib_index = 0
         this.shiftfrq = 0
@@ -499,21 +498,24 @@ class RMTTune {
             }
         }
 
-        if(this.tspd < 1) {
-            this.tspd = this.instrument.tspd 
-            this.tpos += 1
+        if(this.tspd < 0) {
+            this.tspd = this.instrument.tspd - 1
             if(this.tpos >= this.instrument.table.length) {
-               this.tpos = this.instrument.tgo
+                this.tpos = this.instrument.tgo
+                }    
+                if(this.instrument.tmode) {
+                    this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
+                } 
+                else {
+                    this.table_note = (this.instrument.table[this.tpos]) & 0xff
+                }
         }
-            if(this.instrument.tmode) {
-                this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
-            } else {
-                this.table_note = this.instrument.table[this.tpos]
-            }
-        } else {
+        else {
             this.tspd -= 1
         }
-
+        
+        this.tpos += 1
+        
         var frqaddcmd2 = 0
 
         switch(env_cmd) {
