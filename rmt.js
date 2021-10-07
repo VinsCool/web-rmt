@@ -397,86 +397,80 @@ class RMTTune {
         this.env_dist = env_dist
         this.env_filter = env_filter
 
-        var freq_table = frqtabpure_64khz
-        var channel_audctl = player.getPokeyAudctl(this.pokey_idx)
-        switch(env_dist) {
+        var freq_table = frqtabpure_64khz // default
+        let global_audctl = player.getPokeyAudctl(this.pokey_idx)
+        
+        if(((global_audctl & 0x40) && this.channel == 0) || ((global_audctl & 0x20) && (this.channel == 2))) {
+            console.log("1.79mhz mode detected, Channel ", this.channel)
+            switch(env_dist) {
+            case 0xe:
+                env_dist = 0xc
+                freq_table = frqtabgritty_179mhz
+                break            
+            case 0xc:
+                env_dist = 0xc
+                freq_table = frqtabbuzzy_179mhz
+                break                
             case 0xa:
-
-                if(this.instrument.audctl & 0x01) {
+                env_dist = 0xa
+                freq_table = frqtabpure_179mhz               
+                break
+            case 0x6:
+                env_dist = 0xa
+                freq_table = frqtabpure_179mhz               
+                break
+            case 0x2:
+                env_dist = 0x2
+                freq_table = frqtabpoly5_179mhz              
+                break
+            }
+        } 
+        else if(global_audctl & 0x01) {
+            console.log("15khz mode detected")
+            switch(env_dist) {
+            case 0xe:
+                env_dist = 0xc
+                freq_table = frqtabbuzzy_15khz
+                break 
+            case 0xc:
+                env_dist = 0xc
+                freq_table = frqtabbuzzy_15khz
+                break 
+            case 0xa:
                 env_dist = 0xa
                 freq_table = frqtabpure_15khz                
-                }
-                else {
+                break
+            case 0x6:
                 env_dist = 0xa
-                freq_table = frqtabpure_64khz
-                }
+                freq_table = frqtabpure_15khz                
                 break
-
-            case 0xc:
-                if(this.instrument.audctl & 0x40) {
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_179mhz                
-                }
-                else if(this.instrument.audctl & 0x20) {
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_179mhz                
-                }
-                else if(this.instrument.audctl & 0x01) {
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_15khz                
-                }
-                else {
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_64khz
-                }
-                break
-                
+            }
+        }
+        else {
+            switch(env_dist) {
             case 0xe:
-                if(this.instrument.audctl & 0x40) {
-                env_dist = 0xc
-                freq_table = frqtabgritty_179mhz                
-                }
-                else if(this.instrument.audctl & 0x20) {
-                env_dist = 0xc
-                freq_table = frqtabgritty_179mhz                
-                }
-                else if(this.instrument.audctl & 0x01) {
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_15khz                
-                }                
-                else {
                 env_dist = 0xc
                 freq_table = frqtabgritty_64khz
-                }
+                break 
+            case 0xc:
+                env_dist = 0xc
+                freq_table = frqtabbuzzy_64khz
+                break                   
+            case 0xa:
+                env_dist = 0xa
+                freq_table = frqtabpure_64khz                
                 break
-                
             case 0x6:
-                if(this.instrument.audctl & 0x01) {
                 env_dist = 0xa
-                freq_table = frqtabpure_15khz                
-                }
-                else {
-                env_dist = 0xa
-                freq_table = frqtabpure_64khz
-                }
+                freq_table = frqtabpure_64khz                
                 break
-                
             case 0x2:
-                if(this.instrument.audctl & 0x40) {
                 env_dist = 0x2
-                freq_table = frqtabpoly5_179mhz                
-                }
-                else if(this.instrument.audctl & 0x20) {
-                env_dist = 0x2
-                freq_table = frqtabpoly5_179mhz                
-                }
-                else {
-                env_dist = 0x2
-                freq_table = frqtabpoly5_64khz
-                }
-                break     
+                freq_table = frqtabpoly5_64khz                
+                break
+            }
         }
-	console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "ch_audctl:", hex2(channel_audctl), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
+	console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "global audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
         var audf = null
         var note = null
 
@@ -497,9 +491,10 @@ class RMTTune {
                 this.eff_delay -= 1
             }
         }
-
+        
         if(this.tspd < 0) {
             this.tspd = this.instrument.tspd - 1
+            this.tpos += 1
             if(this.tpos >= this.instrument.table.length) {
                 this.tpos = this.instrument.tgo
                 }    
@@ -513,9 +508,7 @@ class RMTTune {
         else {
             this.tspd -= 1
         }
-        
-        this.tpos += 1
-        
+
         var frqaddcmd2 = 0
 
         switch(env_cmd) {
