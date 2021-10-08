@@ -323,7 +323,7 @@ class RMTInstrument {
         let trep = data[1]
         let eend = data[2]
         let erep = data[3]
-        this.tspd = (data[4] & 0x3f) + 1
+        this.tspd = (data[4] & 0x3f) - 1
         this.tmode = (data[4] >> 6) & 1
         this.ttype = (data[4] >> 7) & 1
         this.audctl = data[5]
@@ -352,8 +352,7 @@ class RMTTune {
         this.epos = 0
         this.tpos = 0
         this.is_repeating = false
-        this.tcnt = 0
-        this.tspd = this.instrument.tspd
+        this.tspd = this.instrument.tspd + 1
         this.vib_table = VIB_TABLE[instrument.vibrato]
         this.vib_index = 0
         this.shiftfrq = 0
@@ -538,12 +537,22 @@ class RMTTune {
                 this.eff_delay -= 1
             }
         }
-
-        if(this.instrument.tmode) {
-            this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
-        } 
+        
+        if(this.tspd < 0) {
+            this.tspd = this.instrument.tspd 
+            this.tpos += 1
+            if(this.tpos >= this.instrument.table.length) {
+                this.tpos = this.instrument.tgo
+                }    
+                if(this.instrument.tmode) {
+                    this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
+                } 
+                else {
+                    this.table_note = (this.instrument.table[this.tpos]) & 0xff
+                }
+        }
         else {
-            this.table_note = (this.instrument.table[this.tpos]) & 0xff
+            this.tspd -= 1
         }
 
         var frqaddcmd2 = 0
@@ -620,14 +629,6 @@ class RMTTune {
         }
         player.setPokeyAudf(this.channel, audf)
         player.setPokeyAudc(this.channel, audc)
-
-        this.tcnt = (this.tcnt + 1) % this.instrument.tspd
-        if(!this.tcnt) {
-            this.tpos += 1
-            if(this.tpos >= this.instrument.table.length) {
-                this.tpos = this.instrument.tgo
-            }
-        }
     }
     postPlay(player, prev_audctl) {
         let pokey_channel = this.channel % 4
