@@ -469,8 +469,8 @@ class RMTTune {
                     freq_table = frqtabpure_179mhz               
                     break
                 case 0x6:
-                    env_dist = 0xa
-                    freq_table = frqtabpure_179mhz               
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_179mhz               
                     break
                 case 0x2:
                     env_dist = 0x2
@@ -495,8 +495,8 @@ class RMTTune {
                     freq_table = frqtabpure_15khz                
                     break
                 case 0x6:
-                    env_dist = 0xa
-                    freq_table = frqtabpure_15khz                
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_15khz                
                     break
             }
         }
@@ -516,8 +516,8 @@ class RMTTune {
                     freq_table = frqtabpure_64khz                
                     break
                 case 0x6:
-                    env_dist = 0xa
-                    freq_table = frqtabpure_64khz                
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_64khz                
                     break
                 case 0x2:
                     env_dist = 0x2
