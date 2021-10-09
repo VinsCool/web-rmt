@@ -650,8 +650,8 @@ class RMTTune {
         }
         if(pokey_channel == 1 && (player.getPokeyAudctl(this.pokey_idx) == prev_audctl) || pokey_channel == 3) {
             if((this.env_dist == 6) && (player.getPokeyAudc(this.channel) & 0xf) ) {
-                player.setPokeyAudf((this.channel - 1), frqtabpure_lo[this.outnote])
-                player.setPokeyAudf(this.channel, frqtabpure_hi[this.outnote])
+                player.setPokeyAudf((this.channel - 1), frqtabgritty_lo[this.outnote])
+                player.setPokeyAudf(this.channel, frqtabgritty_hi[this.outnote])
                 player.updatePokeyAudctl(this.pokey_idx, pokey_channel == 1 ? 0x50 : 0x28)
                 if((player.getPokeyAudc(this.channel - 1) & 0x10) == 0) { // audc[ch-1]
                     player.setPokeyAudc(this.channel - 1, 0)
