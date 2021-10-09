@@ -393,127 +393,136 @@ class RMTTune {
         let env_filter = (envelope[env_idx + 1] >> 7) & 1
         let env_portamento = envelope[env_idx + 1] & 1
         let env_xy = envelope[env_idx + 2]
-
         this.env_dist = env_dist
         this.env_filter = env_filter
-
         var freq_table = frqtabpure_64khz // default
         let global_audctl = player.getPokeyAudctl(this.pokey_idx)
-        
-        if((global_audctl & 0x10) && ((this.channel == 0) || (this.channel == 1))) {
-            if(this.channel == 1) {
-                //console.log("Join mode detected, Channel ", this.channel)
-                switch(env_dist) {
-                case 0xa:
-                    env_dist = 0xa
-                    freq_table = clarinet_hi
-                    //console.log("freq_table clarinet_hi loaded in channel ", this.channel)              
-                    break                
-                }
-            }
-            else if((global_audctl & 0x40) && (this.channel == 0)) {
-                    //console.log("Join + 1.79mhz mode detected, Channel ", this.channel)
-                    switch(env_dist) {
-                    case 0xa:
-                        env_dist = 0xc
-                        freq_table = clarinet_lo 
-                        //console.log("freq_table clarinet_lo loaded in channel ", this.channel)             
-                        break                
-                    }   
-            }
-        }
 
-        else if((global_audctl & 0x08) && ((this.channel == 2) || (this.channel == 3))) {
-            if(this.channel == 3) {
-                //console.log("Join mode detected, Channel ", this.channel)
-                switch(env_dist) {
+        // Join + 1.79mhz mode, channels 2 or 4
+        if((((global_audctl & 0x40) && (global_audctl & 0x10)) && ((this.channel == 1) || (this.channel == 5))) || (((global_audctl & 0x20) && (global_audctl & 0x08)) && ((this.channel == 3) || (this.channel == 7)))) {
+            //console.log("Join + 1.79mhz mode detected, Channel", this.channel, "from POKEY", this.pokey_idx)
+            switch(env_dist) {
+                case 0xe:
+                    env_dist = 0xc
+                    freq_table = frqtabgritty_hi
+                    //console.log("freq_table frqtabgritty_hi loaded in channel", this.channel, "from POKEY", this.pokey_idx)              
+                    break
                 case 0xa:
                     env_dist = 0xa
+                    freq_table = frqtabpure_hi
+                    //console.log("freq_table frqtabpure_hi loaded in channel", this.channel, "from POKEY", this.pokey_idx)              
+                    break
+                /*case 0x6:
+                    env_dist = 0xa
                     freq_table = clarinet_hi
-                    //console.log("freq_table clarinet_hi loaded in channel ", this.channel)              
-                    break                
+                    //console.log("freq_table clarinet_hi loaded in channel", this.channel, "from POKEY", this.pokey_idx)              
+                    break*/                
                 }
+            } 
+	// Join + 1.79mhz mode, channels 1 or 3
+	else if((((global_audctl & 0x40) && (global_audctl & 0x10)) && ((this.channel == 0) || (this.channel == 4))) || (((global_audctl & 0x20) && (global_audctl & 0x08)) && ((this.channel == 2) || (this.channel == 6)))) {
+            //console.log("Join + 1.79mhz mode detected, Channel", this.channel, "from POKEY", this.pokey_idx)
+            switch(env_dist) {
+                case 0xe:
+                    env_dist = 0
+                    freq_table = frqtabgritty_lo
+                    //console.log("freq_table frqtabgritty_lo loaded in channel", this.channel, "from POKEY", this.pokey_idx, "Setting volume output to 0")
+                    if(this.pokey_idx) {
+                        env_rvol = 0
+                    }
+                    else {
+                        env_lvol = 0
+                    }            
+                    break
+                case 0xa:
+                    env_dist = 0
+                    freq_table = frqtabpure_lo
+                    //console.log("freq_table frqtabpure_lo loaded in channel", this.channel, "from POKEY", this.pokey_idx, "Setting volume output to 0")
+                    if(this.pokey_idx) {
+                        env_rvol = 0
+                    }
+                    else {
+                        env_lvol = 0
+                    }  
+                    break
+                /*case 0x6:
+                    env_dist = 0xc
+                    freq_table = clarinet_lo 
+                    //console.log("freq_table clarinet_lo loaded in channel", this.channel, "from POKEY", this.pokey_idx)             
+                    break*/                
+                }   
             }
-            else if((global_audctl & 0x20) && (this.channel == 2)) {
-                    //console.log("Join + 1.79mhz mode detected, Channel ", this.channel)
-                    switch(env_dist) {
-                    case 0xa:
-                        env_dist = 0xc
-                        freq_table = clarinet_lo 
-                        //console.log("freq_table clarinet_lo loaded in channel ", this.channel)             
-                        break                
-                    }   
+	// 1.79mhz mode
+	else if((global_audctl & 0x40) && ((this.channel == 0) || (this.channel == 4)) || ((global_audctl & 0x20) && ((this.channel == 2) || (this.channel == 6)))) {
+            //console.log("1.79mhz mode detected, Channel", this.channel, "from POKEY", this.pokey_idx)
+            switch(env_dist) {
+                case 0xe:
+                    env_dist = 0xc
+                    freq_table = frqtabgritty_179mhz
+                    break            
+                case 0xc:
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_179mhz
+                    break                
+                case 0xa:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_179mhz               
+                    break
+                case 0x6:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_179mhz               
+                    break
+                case 0x2:
+                    env_dist = 0x2
+                    freq_table = frqtabpoly5_179mhz              
+                    break
             }
         }
-        
-        else if((global_audctl & 0x40) && (this.channel == 0) || ((global_audctl & 0x20) && (this.channel == 2))) {
-            //console.log("1.79mhz mode detected, Channel ", this.channel)
-            switch(env_dist) {
-            case 0xe:
-                env_dist = 0xc
-                freq_table = frqtabgritty_179mhz
-                break            
-            case 0xc:
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_179mhz
-                break                
-            case 0xa:
-                env_dist = 0xa
-                freq_table = frqtabpure_179mhz               
-                break
-            case 0x6:
-                env_dist = 0xa
-                freq_table = frqtabpure_179mhz               
-                break
-            case 0x2:
-                env_dist = 0x2
-                freq_table = frqtabpoly5_179mhz              
-                break
-            }
-        } 
+        // 15khz mode 
         else if(global_audctl & 0x01) {
-            //console.log("15khz mode detected")
+            //console.log("15khz mode detected, from POKEY", this.pokey_idx)
             switch(env_dist) {
-            case 0xe:
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_15khz
-                break 
-            case 0xc:
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_15khz
-                break 
-            case 0xa:
-                env_dist = 0xa
-                freq_table = frqtabpure_15khz                
-                break
-            case 0x6:
-                env_dist = 0xa
-                freq_table = frqtabpure_15khz                
-                break
+                case 0xe:
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_15khz
+                    break 
+                case 0xc:
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_15khz
+                    break 
+                case 0xa:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_15khz                
+                    break
+                case 0x6:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_15khz                
+                    break
             }
         }
+        // 64khz mode
         else {
             switch(env_dist) {
-            case 0xe:
-                env_dist = 0xc
-                freq_table = frqtabgritty_64khz
-                break 
-            case 0xc:
-                env_dist = 0xc
-                freq_table = frqtabbuzzy_64khz
-                break                   
-            case 0xa:
-                env_dist = 0xa
-                freq_table = frqtabpure_64khz                
-                break
-            case 0x6:
-                env_dist = 0xa
-                freq_table = frqtabpure_64khz                
-                break
-            case 0x2:
-                env_dist = 0x2
-                freq_table = frqtabpoly5_64khz                
-                break
+                case 0xe:
+                    env_dist = 0xc
+                    freq_table = frqtabgritty_64khz
+                    break 
+                case 0xc:
+                    env_dist = 0xc
+                    freq_table = frqtabbuzzy_64khz
+                    break                   
+                case 0xa:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_64khz                
+                    break
+                case 0x6:
+                    env_dist = 0xa
+                    freq_table = frqtabpure_64khz                
+                    break
+                case 0x2:
+                    env_dist = 0x2
+                    freq_table = frqtabpoly5_64khz                
+                    break
             }
         }
 	//console.log("ch:", this.channel, "audc:", hex2(player.getPokeyAudc(this.channel)), "global audctl:", hex2(player.getPokeyAudctl(this.pokey_idx)), "env_dist", hex2(env_dist), "freq_table[0]:", hex2(freq_table[0]))
