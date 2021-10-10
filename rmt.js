@@ -323,7 +323,7 @@ class RMTInstrument {
         let trep = data[1]
         let eend = data[2]
         let erep = data[3]
-        this.tspd = (data[4] & 0x3f) - 1
+        this.tspd = (data[4] & 0x3f) + 1
         this.tmode = (data[4] >> 6) & 1
         this.ttype = (data[4] >> 7) & 1
         this.audctl = data[5]
@@ -351,8 +351,8 @@ class RMTTune {
         this.regs_offset = channel < 4 ? 0 : 9
         this.epos = 0
         this.tpos = 0
+        this.tcnt = 0
         this.is_repeating = false
-        this.tspd = this.instrument.tspd + 1
         this.vib_table = VIB_TABLE[instrument.vibrato]
         this.vib_index = 0
         this.shiftfrq = 0
@@ -546,23 +546,6 @@ class RMTTune {
                 this.eff_delay -= 1
             }
         }
-        
-        if(this.tspd < 0) {
-            this.tspd = this.instrument.tspd 
-            this.tpos += 1
-            if(this.tpos >= this.instrument.table.length) {
-                this.tpos = this.instrument.tgo
-                }    
-                if(this.instrument.tmode) {
-                    this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
-                } 
-                else {
-                    this.table_note = (this.instrument.table[this.tpos]) & 0xff
-                }
-        }
-        else {
-            this.tspd -= 1
-        }
 
         var frqaddcmd2 = 0
 
@@ -636,6 +619,20 @@ class RMTTune {
         if(env_portamento) {
             audf = (frq + this.shiftfrq) & 0xff
         }
+
+        this.tcnt = (this.tcnt + 1) % this.instrument.tspd
+        if(this.tcnt == 0) {
+            this.tpos += 1
+            if(this.tpos >= this.instrument.table.length) {
+                this.tpos = this.instrument.tgo
+            }
+            if(this.instrument.tmode) {
+                this.table_note = (this.table_note + this.instrument.table[this.tpos]) & 0xff
+            } else {
+                this.table_note = this.instrument.table[this.tpos]
+            }
+        }
+
         player.setPokeyAudf(this.channel, audf)
         player.setPokeyAudc(this.channel, audc)
     }
@@ -703,12 +700,14 @@ class Portamento {
 }
 
 export class RMTPlayer {
+    static PLAYING_LATENCY = 0.1
+    static INTERACTIVE_LATENCY = 0.02
+
     constructor(audioContext, pokeyNode, config) {
         config = config || {}
         this.audioContext = audioContext
         this.pokeyNode = pokeyNode
         this.state = "stopped"
-        this.latency = 0.10
         this.pokeyRegs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         this.setFrameRate(config.frameRate || 50.0)
     }
@@ -716,8 +715,7 @@ export class RMTPlayer {
     setFrameRate(fps) {
         this.frameRate = fps
         this.frameInterval = 1 / this.frameRate / (this.song && this.song.instrumentFreq || 1)
-        this.currentFrame = 0
-        this.startTime = this.getCurrentTime()
+	this.resetStartTime()
     }
 
     load(buffer) {
@@ -808,15 +806,16 @@ export class RMTPlayer {
     }
 
     fillBuffer() {
-        if(this.state != "playing") {
+        if(!this.song)
             return;
-        }
 
         let currentTime = this.getCurrentTime();
-        while(this.startTime + this.currentFrame * this.frameInterval < currentTime + this.latency) {
+        while(this.startTime + this.currentFrame * this.frameInterval < currentTime) {
             this.step()
             this.sendEvent(this.pokeyRegs);
             this.currentFrame += 1
+            if(this.state != "playing")
+                continue;            
             this.instrPos += 1
             if(this.instrPos >= this.songSpeed * this.song.instrumentFreq) {
                 this.instrPos = 0
@@ -827,18 +826,13 @@ export class RMTPlayer {
                         this.tracksListPos += 1
                         if(this.tracksListPos >= this.song.trackLists.length) {
                             this.tracksListPos = 0
-                            this.currentFrame = 0
-                            this.startTime = currentTime
+			    this.resetStartTime()
                         }
                         this.loadTracks()
                     }
                 }
                 this.loadTracksEntries()
             }
-            // if(this.currentFrame == 0) {
-            //     this.startTime = currentTime;
-            //     return;
-            // }
         }
     }
 
@@ -883,26 +877,27 @@ export class RMTPlayer {
         this.sendRegs(this.pokeyRegs)
     }
 
+    resetStartTime(latency) {
+        this.latency = latency || RMTPlayer.PLAYING_LATENCY
+        this.currentFrame = 0
+        this.startTime = this.getCurrentTime()
+    }
+
     getCurrentTime() {
-        return this.audioContext.currentTime;
+        return this.audioContext.currentTime + this.latency
     }
 
     play() {
         this.loadTracks()
         this.loadTracksEntries()
 
-        let currentTime = this.getCurrentTime();
-        if(this.startTime == null) {
-            this.startTime = currentTime - this.currentFrame * this.frameInterval;
-        }
+	this.resetStartTime()
         this.state = "playing";
         this.fillBuffer();
     }
 
     pause() {
         this.state = "paused";
-        this.interval = null;
-        this.startTime = null;
         this.loadCurrentFrame();
     }
 
@@ -943,7 +938,7 @@ export class RMTPlayer {
     }
 
     sendRegs(regs) {
-        let t = this.startTime != null ? this.startTime + this.currentFrame * this.frameInterval : this.getCurrentTime() + this.latency;
+	let t = this.startTime + this.currentFrame * this.frameInterval
         let n_regs = this.song && this.song.n_channels == 4 ? 9 : 18
         let msg = regs.slice(0, n_regs).flatMap((v, i) => [i < 9 ? i : i - 9 + 16, v, t])
         this.pokeyNode.port.postMessage(msg);
@@ -951,7 +946,6 @@ export class RMTPlayer {
     }
     stop() {
         this.state = "stopped";
-        this.startTime = null;
 
         this.instrPos = 0
         this.trackPos = 0
@@ -963,8 +957,7 @@ export class RMTPlayer {
         this.tracksListPos = 0
         this.repeat_track = false
 
-        this.currentFrame = 0;
-        for(var i=0; i<this.pokeyRegs.length; i++) {
+	for(var i=0; i < this.pokeyRegs.length; i++) {
             this.pokeyRegs[i] = 0;
         }
         this.sendRegs(EMPTY_POKEY_REGS)
