@@ -362,25 +362,24 @@ class RMTTune {
     }
 
         writeToAudctl(player) {
-                let env_idx = this.epos * 3
-        let envelope = this.instrument.envelope
-        let env_cmd = (envelope[env_idx + 1] >> 4) & 7
-        let env_xy = envelope[env_idx + 2]
-                var env_dist = ((envelope[env_idx + 1] >> 1) & 7) * 2
-                let env_lvol = envelope[env_idx] & 0xf
-        let env_rvol = envelope[env_idx] >> 4
-                let vol = this.channel < 4 ? env_lvol : env_rvol
-                var audc = VOLUME_TAB[player.getChannelVolume(this.channel) << 4 | vol] | (env_dist << 4)
-                // cmd 7 sets the instrument audctl
-                if (env_cmd == 7) {
-                        if(env_xy == 0xff) {
-                                audc |= 0xf0  // volume only
-            } else {
-                                //this.note = env_xy
-                                this.instrument.audctl = env_xy
-            }
+            let env_idx = this.epos * 3
+            let envelope = this.instrument.envelope
+            let env_cmd = (envelope[env_idx + 1] >> 4) & 7
+            let env_xy = envelope[env_idx + 2]
+            var env_dist = ((envelope[env_idx + 1] >> 1) & 7) * 2
+            let env_lvol = envelope[env_idx] & 0xf
+            let env_rvol = envelope[env_idx] >> 4
+            let vol = this.channel < 4 ? env_lvol : env_rvol
+            var audc = VOLUME_TAB[player.getChannelVolume(this.channel) << 4 | vol] | (env_dist << 4)
+            // cmd 7 sets the instrument audctl, 0x80 SHOULD set Poly9 Noise mode, but it conflicts Volume Only
+            // tunes must be edited if they do use Volume Only mode, else the AUDCTL is overwritten
+            // TODO: find a way to not fully overwrite this.instrument.audctl, so it is reset every new note
+            if(env_cmd == 7) {
+                if((env_xy != 0xff) && (env_xy != 0x80)) {
+                this.instrument.audctl = env_xy
                 }
-                player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
+            }
+            player.updatePokeyAudctl(this.pokey_idx, this.instrument.audctl)
         }
 
     play(player) {
@@ -397,7 +396,7 @@ class RMTTune {
         this.env_filter = env_filter
         var freq_table = frqtabpure_64khz // default
         let global_audctl = player.getPokeyAudctl(this.pokey_idx)
-
+        
         // Join + 1.79mhz mode, channels 2 or 4
         if((((global_audctl & 0x40) && (global_audctl & 0x10)) && ((this.channel == 1) || (this.channel == 5))) || (((global_audctl & 0x20) && (global_audctl & 0x08)) && ((this.channel == 3) || (this.channel == 7)))) {
             //console.log("Join + 1.79mhz mode detected, Channel", this.channel, "from POKEY", this.pokey_idx)
@@ -592,6 +591,9 @@ class RMTTune {
                 note = this.note
                 break
             case 7:
+                if ((env_xy == 0xff) || (env_xy == 0x80)){
+                    audc |= 0xf0  // volume only
+                }
                 note = this.note
                 break
             default:
